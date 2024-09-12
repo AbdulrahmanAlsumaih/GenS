@@ -2,8 +2,8 @@ import os
 import torch
 import numpy as np
 from PIL import Image
-from pyhocon import ConfigFactory
 import sys
+import json
 
 # Add the project directory to Python path
 # Adjust this path to the root of your project directory
@@ -20,12 +20,18 @@ def get_device():
     else:
         return torch.device("cpu")
 
-def load_model(config_path, checkpoint_path, device):
-    conf = ConfigFactory.parse_file(config_path)
-    model = GenS(conf["model"]).to(device)
+def load_config(config_path):
+    with open(config_path, 'r') as f:
+        config_str = f.read()
+    # Convert HOCON-like format to JSON
+    config_json = '{' + config_str.replace('=', ':').replace('{', '{').replace('}', '}') + '}'
+    return json.loads(config_json)
+
+def load_model(config, checkpoint_path, device):
+    model = GenS(config["model"]).to(device)
     model.load_params_vol(checkpoint_path, device)
     model.eval()
-    return model, conf
+    return model, config
 
 def prepare_input(image_path, intrinsics, c2w, img_hw):
     # Load and preprocess image
@@ -74,9 +80,13 @@ def main():
     image_path = "/content/input_image.png"
     output_dir = "/content/GenS/output"
 
+    # Load configuration
+    print("Loading configuration...")
+    config = load_config(config_path)
+
     # Load model and config
     print("Loading model and config...")
-    model, conf = load_model(config_path, checkpoint_path, device)
+    model, conf = load_model(config, checkpoint_path, device)
 
     # Get image size from config
     img_hw = conf["val_dataset"]["img_hw"]
